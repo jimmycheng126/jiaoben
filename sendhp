@@ -1,0 +1,82 @@
+// ==UserScript==
+// @name pc4 1-1-25 5.35am
+// @namespace http://tampermonkey.net/
+// @version 2.0
+// @description 按顺序发送手机号码，并处理验证码和动态加载问题
+// @author Jimmy cheng
+// @match *://*/register
+// @match *://*/register/SMSRegister
+// @grant GM_log
+// @grant GM_xmlhttpRequest
+// ==/UserScript==
+
+(function () {
+    'use strict';
+    const phoneNumbers = [
+        // ...（省略号码）
+    ];
+
+    let currentIndex = parseInt(localStorage.getItem('currentIndex')) || 0;
+    let isRunning = true;
+
+    function createStopButton() {
+        // ...（保持不变）
+    }
+
+    function waitForElement(selector, callback, interval = 500, timeout = 10000) {
+        // ...（保持不变）
+    }
+
+    function updateRemainingCount() {
+        // ...（保持不变）
+    }
+
+    function processNextNumber() {
+        if (!isRunning) {
+            return;
+        }
+
+        if (currentIndex >= phoneNumbers.length) {
+            alert("所有手机号码已发送完毕。");
+            return;
+        }
+
+        console.log(`准备发送第 ${currentIndex + 1} 个号码: ${phoneNumbers[currentIndex]}`);
+        updateRemainingCount();
+
+        waitForElement('input[name="mobile"]', (inputField) => {
+            inputField.value = phoneNumbers[currentIndex];
+            console.log(`输入手机号码: ${phoneNumbers[currentIndex]}`);
+
+            waitForElement('.btn.warning.get-code', (sendButton) => {
+                sendButton.click();
+                console.log("点击发送按钮。");
+
+                setTimeout(() => {
+                    const yesButton = document.querySelector('.swal2-confirm');
+                    if (yesButton) {
+                        yesButton.click();
+                        console.log("点击确认按钮。");
+
+                        setTimeout(() => {
+                            const captchaElement = document.getElementById('aliyunCaptcha-window-popup');
+                            if (captchaElement && captchaElement.style.display === 'block') {
+                                console.log("检测到滑动验证码，刷新页面并重新开始。");
+                                location.reload();
+                                return;
+                            }
+
+                            // 更新索引并存储到 localStorage
+                            currentIndex++;
+                            localStorage.setItem('currentIndex', currentIndex);
+                            processNextNumber(); // 处理下一个号码
+                        }, 2000); // 根据需要调整超时
+                    }
+                }, 2000); // 根据需要调整超时
+            });
+        });
+    }
+
+    createStopButton();
+    processNextNumber(); // 启动处理
+})();
