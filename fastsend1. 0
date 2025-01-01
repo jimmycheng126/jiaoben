@@ -1,0 +1,105 @@
+// ==UserScript==
+// @name         Simple SMS Sender
+// @namespace    http://tampermonkey.net/
+// @version      1.0
+// @description  简化版短信发送脚本
+// @author       Jimmy cheng
+// @match        *://*/register
+// @match        *://*/register/SMSRegister
+// @grant        GM_log
+// ==/UserScript==
+
+(function() {
+    'use strict';
+
+    // 手机号码库
+    const phoneNumbers = [
+        "01139433358", "01139471706", "01139416059", "01139454418", "01139416057",
+        "01139430148", "01139429168", "01139429877", "01139428728", "01139454397",
+        "01139415660", "01139430095", "01139429899", "01139456283", "01139434017",
+        "01139433677", "01139414478", "01139471026", "01139417322", "01139472352",
+        "01139472682", "01139419006", "01139415980", "01139430503", "01139471023",
+        // ... 其他号码 ...
+    ];
+
+    // 从localStorage获取当前索引
+    let currentIndex = parseInt(localStorage.getItem('currentIndex')) || 0;
+    let isRunning = true;
+
+    // 创建简单的停止按钮
+    const stopBtn = document.createElement('button');
+    stopBtn.innerText = '停止';
+    stopBtn.style.cssText = 'position:fixed;bottom:20px;right:20px;z-index:9999;padding:10px;';
+    stopBtn.onclick = () => {
+        isRunning = false;
+        alert('已停止发送');
+    };
+    document.body.appendChild(stopBtn);
+
+    // 等待元素出现
+    function waitForElement(selector) {
+        return new Promise((resolve) => {
+            const checkElement = () => {
+                const element = document.querySelector(selector);
+                if (element) {
+                    resolve(element);
+                } else {
+                    setTimeout(checkElement, 500);
+                }
+            };
+            checkElement();
+        });
+    }
+
+    // 处理下一个号码
+    async function processNextNumber() {
+        if (!isRunning) return;
+
+        if (currentIndex >= phoneNumbers.length) {
+            alert("所有号码已发送完毕");
+            return;
+        }
+
+        try {
+            // 等待输入框并输入号码
+            const inputField = await waitForElement('input[name="mobile"]');
+            inputField.value = phoneNumbers[currentIndex];
+            
+            // 等待并点击发送按钮
+            const sendButton = await waitForElement('.btn.warning.get-code');
+            sendButton.click();
+
+            // 等待并处理确认按钮
+            setTimeout(async () => {
+                const confirmBtn = document.querySelector('.swal2-confirm');
+                if (confirmBtn) {
+                    confirmBtn.click();
+                }
+
+                // 检查验证码
+                setTimeout(() => {
+                    const captcha = document.getElementById('aliyunCaptcha-window-popup');
+                    if (captcha && captcha.style.display === 'block') {
+                        console.log("检测到验证码，刷新页面");
+                        location.reload();
+                        return;
+                    }
+
+                    // 成功发送，处理下一个号码
+                    currentIndex++;
+                    localStorage.setItem('currentIndex', currentIndex);
+                    
+                    // 随机延迟2-4秒后继续
+                    setTimeout(processNextNumber, 2000 + Math.random() * 2000);
+                }, 1000);
+            }, 1000);
+
+        } catch (error) {
+            console.error('处理出错:', error);
+            setTimeout(processNextNumber, 3000);
+        }
+    }
+
+    // 开始执行
+    setTimeout(processNextNumber, 1000);
+})();
