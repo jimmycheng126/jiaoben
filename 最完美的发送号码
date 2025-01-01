@@ -1,0 +1,152 @@
+// ==UserScript==
+// @name pc gorry
+// @namespace http://tampermonkey.net/
+// @version 2.0
+// @description 按顺序发送手机号码，并处理验证码和动态加载问题
+// @author Jimmy cheng
+// @match *://*/register
+// @match *://*/register/SMSRegister
+// @grant GM_log
+// @grant GM_xmlhttpRequest
+// ==/UserScript==
+
+(function () {
+    'use strict';
+  // 手机号码库
+   const phoneNumbers = [
+    "01139433358", "01139471706", "01139416059", "01139454418", "01139416057",
+    "01139430148", "01139429168", "01139429877", "01139428728", "01139454397",
+    "01139415660", "01139430095", "01139429899", "01139456283", "01139434017",
+    "01139433677", "01139414478", "01139471026", "01139417322", "01139472352",
+    "01139472682", "01139419006", "01139415980", "01139430503", "01139471023",
+    "01139472271", "01139472599", "01139416800", "01139434146", "01139456127",
+    "01139464850", "01139418102", "01139454271", "01139433833", "01139433197",
+    "01139433461", "01139432474", "01139454379", "01139434081", "01139465895",
+    "01139429404", "01139413771", "01139432410", "01139471196", "01139429356",
+    "01139417465", "01139429701", "01139418108", "01139433998", "01139433800",
+    "01139415526", "01139433614", "01139454188", "01139472049", "01139434136",
+    "01139414945", "01139433621", "01139417325", "01139430157", "01139414893",
+    "01139461513", "01139454205", "01139473733", "01139432913", "01139432879",
+    "01139417721", "01139433066", "01139432898", "01139416294", "01139428742",
+    "01139430019", "01139413962", "01139429964", "01139459698", "01139415734",
+    "01139415730", "01139471241", "01139473008", "01139472938", "01139419044",
+    "01139418251", "01139417849", "01139464200", "01139429957", "01139431044",
+    "01139415238", "01139416029", "01139418473", "01139417545", "01139415668",
+    "01139418398", "01139471553"
+];
+ // 从 localStorage 获取当前索引
+    let currentIndex = parseInt(localStorage.getItem('currentIndex')) || 0;
+    let isRunning = true; // 控制脚本是否运行
+
+    // 创建停止按钮
+    function createStopButton() {
+        const button = document.createElement('button');
+        button.innerText = '停止发送';
+        button.style.position = 'fixed';
+        button.style.top = '10px';
+        button.style.right = '10px';
+        button.style.zIndex = '1000';
+        button.onclick = () => {
+            isRunning = false;
+            alert("发送已停止。");
+        };
+        document.body.appendChild(button);
+    }
+
+    // 检查元素是否加载完成
+    function waitForElement(selector, callback, interval = 500, timeout = 10000) {
+        const startTime = Date.now();
+        const timer = setInterval(() => {
+            const element = document.querySelector(selector);
+            if (element) {
+                clearInterval(timer);
+                callback(element);
+            } else if (Date.now() - startTime > timeout) {
+                clearInterval(timer);
+                console.error(`等待元素 ${selector} 超时`);
+            }
+        }, interval);
+    }
+
+    // 更新剩余号码显示
+    function updateRemainingCount() {
+        const remainingCount = phoneNumbers.length - currentIndex;
+        const display = document.getElementById('remainingCount');
+        if (display) {
+            display.innerText = `剩余号码: ${remainingCount}`;
+        } else {
+            const countDisplay = document.createElement('div');
+            countDisplay.id = 'remainingCount';
+            countDisplay.style.position = 'fixed';
+            countDisplay.style.top = '50px';
+            countDisplay.style.right = '10px';
+            countDisplay.style.zIndex = '1000';
+            countDisplay.style.backgroundColor = 'white';
+            countDisplay.style.padding = '10px';
+            countDisplay.style.border = '1px solid black';
+            countDisplay.innerText = `剩余号码: ${remainingCount}`;
+            document.body.appendChild(countDisplay);
+        }
+    }
+
+    // 处理下一个手机号码
+    function processNextNumber() {
+        if (!isRunning) {
+            return; // 如果停止运行，直接返回
+        }
+
+        if (currentIndex >= phoneNumbers.length) {
+            alert("所有手机号码已发送完毕。");
+            return;
+        }
+
+        console.log(`准备发送第 ${currentIndex + 1} 个号码: ${phoneNumbers[currentIndex]}`);
+        updateRemainingCount(); // 更新剩余号码
+
+        // 等待输入框加载
+        waitForElement('input[name="mobile"]', (inputField) => {
+            inputField.value = phoneNumbers[currentIndex];
+            console.log(`输入手机号码: ${phoneNumbers[currentIndex]}`);
+
+            waitForElement('.btn.warning.get-code', (sendButton) => {
+                // 点击发送按钮
+                sendButton.click();
+                console.log("点击发送按钮。");
+
+                // 等待确认按钮
+                setTimeout(() => {
+                    const yesButton = document.querySelector('.swal2-confirm');
+                    if (yesButton) {
+                        yesButton.click();
+                        console.log("点击确认按钮。");
+
+                        // 检查滑动验证码
+                        setTimeout(() => {
+                            const captchaElement = document.getElementById('aliyunCaptcha-window-popup');
+                            if (captchaElement && captchaElement.style.display === 'block') {
+                                console.log("检测到滑动验证码，刷新页面并重新开始。");
+                                location.reload();
+                                return;
+                            }
+
+                            // 如果没有验证码，等待一段时间后处理下一个号码
+                            setTimeout(() => {
+                                currentIndex++;
+                                localStorage.setItem('currentIndex', currentIndex);
+                                processNextNumber(); // 继续处理下一个号码
+                            }, 3000);
+                        }, 1000);
+                    } else {
+                        console.error('未找到确认按钮，请检查页面结构。');
+                    }
+                }, 1000);
+            });
+        });
+    }
+
+    // 启动脚本
+    window.onload = function () {
+        createStopButton(); // 创建停止按钮
+        setTimeout(processNextNumber, 1000); // 页面加载后延迟1秒开始处理
+    };
+})();
