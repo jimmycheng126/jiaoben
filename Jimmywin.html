@@ -1,0 +1,99 @@
+id: dynamic_wallpaper
+name: 吉米赢动态壁纸
+type: html
+content: |-
+  <!DOCTYPE html>
+  <html>
+  <head>
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+        height: 100vh;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        background: linear-gradient(45deg, #1a1a1a, #2c3e50);
+        overflow: hidden;
+      }
+      
+      .container {
+        position: relative;
+        width: 100%;
+        height: 100%;
+      }
+      
+      .brand {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        text-align: center;
+        color: #fff;
+        font-family: Arial, sans-serif;
+        z-index: 2;
+      }
+      
+      .chinese {
+        font-size: 48px;
+        font-weight: bold;
+        margin-bottom: 10px;
+        text-shadow: 0 0 10px rgba(255,255,255,0.5);
+        animation: glow 2s ease-in-out infinite;
+      }
+      
+      .english {
+        font-size: 24px;
+        letter-spacing: 3px;
+        text-transform: uppercase;
+        opacity: 0.8;
+      }
+      
+      .particles {
+        position: absolute;
+        width: 100%;
+        height: 100%;
+      }
+      
+      .particle {
+        position: absolute;
+        width: 5px;
+        height: 5px;
+        background: rgba(255,255,255,0.5);
+        border-radius: 50%;
+        animation: float 8s linear infinite;
+      }
+      
+      @keyframes glow {
+        0% { text-shadow: 0 0 10px rgba(255,255,255,0.5); }
+        50% { text-shadow: 0 0 20px rgba(255,255,255,0.8), 0 0 30px rgba(255,255,255,0.6); }
+        100% { text-shadow: 0 0 10px rgba(255,255,255,0.5); }
+      }
+      
+      @keyframes float {
+        0% { transform: translateY(100vh) translateX(0); opacity: 1; }
+        100% { transform: translateY(-100vh) translateX(20px); opacity: 0; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="particles">
+        <!-- 动态粒子效果 -->
+        <script>
+          for(let i = 0; i < 50; i++) {
+            const particle = document.createElement('div');
+            particle.className = 'particle';
+            particle.style.left = Math.random() * 100 + '%';
+            particle.style.animationDelay = Math.random() * 8 + 's';
+            document.querySelector('.particles').appendChild(particle);
+          }
+        </script>
+      </div>
+      <div class="brand">
+        <div class="chinese">吉米赢</div>
+        <div class="english">JIMMY WIN</div>
+      </div>
+    </div>
+  </body>
+  </html>
