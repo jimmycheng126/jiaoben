@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         吉米2远程发射号码（优化版）
 // @namespace    http://tampermonkey.net/
-// @version      2-4-25-remote-optimized
-// @description  吉米射号码（远程手机号，速度优化版）
+// @version      29-3-26 发行体验
+// @description  (吉米发射短信演示）
 // @match        *://*/*
 // @grant        none
 // @run-at       document-idle
