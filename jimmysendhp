@@ -1,0 +1,276 @@
+// ==UserScript==
+// @name         吉米2远程发射号码（优化版）
+// @namespace    http://tampermonkey.net/
+// @version      2-4-25-remote-optimized
+// @description  吉米射号码（远程手机号，速度优化版）
+// @match        *://*/*
+// @grant        none
+// @run-at       document-idle
+// ==/UserScript==
+
+(function() {
+    'use strict';
+
+    let phoneNumbers = [];
+    const startIndex = 0;
+    let currentIndex = parseInt(localStorage.getItem('currentIndex')) || startIndex;
+    let isRunning = true;
+    let isFirstRun = !localStorage.getItem('scriptStarted');
+    let phoneNumbersLoaded = false;
+    let isWaitingForCaptcha = false; // 新增：标记是否在等待验证码处理
+
+    // 预加载手机号列表
+    loadPhoneNumbers();
+
+    function createButtons() {
+        const controlPanel = document.createElement('div');
+        controlPanel.style = 'position: fixed; top: 10px; right: 10px; z-index: 1000; background: rgba(255,255,255,0.9); padding: 10px; border-radius: 5px; box-shadow: 0 0 10px rgba(0,0,0,0.2);';
+        document.body.appendChild(controlPanel);
+
+        const stopButton = document.createElement('button');
+        stopButton.innerText = '停止发送';
+        stopButton.style = 'margin: 5px; padding: 5px 10px;';
+        stopButton.onclick = () => {
+            isRunning = false;
+            alert("发送已停止。");
+        };
+        controlPanel.appendChild(stopButton);
+
+        const resetButton = document.createElement('button');
+        resetButton.innerText = '重置进度';
+        resetButton.style = 'margin: 5px; padding: 5px 10px;';
+        resetButton.onclick = () => {
+            currentIndex = startIndex;
+            localStorage.setItem('currentIndex', currentIndex);
+            localStorage.removeItem('scriptStarted');
+            isWaitingForCaptcha = false;
+            updateRemainingCount();
+            alert("进度已重置。");
+        };
+        controlPanel.appendChild(resetButton);
+
+        // 新增：继续按钮，用于手动处理验证码后继续
+        const continueButton = document.createElement('button');
+        continueButton.innerText = '继续发送';
+        continueButton.style = 'margin: 5px; padding: 5px 10px; background: #4CAF50; color: white;';
+        continueButton.onclick = () => {
+            if (isWaitingForCaptcha) {
+                isWaitingForCaptcha = false;
+                console.log("手动验证完成，继续处理下一个号码");
+                processNextNumber();
+            } else {
+                alert("当前没有在等待验证码处理");
+            }
+        };
+        controlPanel.appendChild(continueButton);
+
+        const countDisplay = document.createElement('div');
+        countDisplay.id = 'remainingCount';
+        countDisplay.style = 'margin-top: 10px; text-align: center; font-weight: bold;';
+        controlPanel.appendChild(countDisplay);
+
+        const statusDisplay = document.createElement('div');
+        statusDisplay.id = 'statusDisplay';
+        statusDisplay.style = 'margin-top: 5px; text-align: center; font-size: 12px; color: #666;';
+        controlPanel.appendChild(statusDisplay);
+
+        updateRemainingCount();
+        updateStatusDisplay();
+    }
+
+    function updateRemainingCount() {
+        if (!phoneNumbersLoaded) return;
+
+        const remainingCount = phoneNumbers.length - currentIndex;
+        const display = document.getElementById('remainingCount');
+        if (display) {
+            display.innerText = `剩余号码: ${remainingCount}`;
+        }
+    }
+
+    function updateStatusDisplay() {
+        const statusDisplay = document.getElementById('statusDisplay');
+        if (statusDisplay) {
+            if (isWaitingForCaptcha) {
+                statusDisplay.innerText = '状态: 等待验证码处理';
+                statusDisplay.style.color = '#FF9800';
+            } else {
+                statusDisplay.innerText = '状态: 运行中';
+                statusDisplay.style.color = '#4CAF50';
+            }
+        }
+    }
+
+    function sendApiNotification(type) {
+        const currentUrl = window.location.href;
+        let notificationMessage = '';
+
+        if (type === 'start') {
+            notificationMessage = `吉米号码注册开始 - 来自网址: ${currentUrl}，从第${currentIndex + 1}个号码开始`;
+        } else if (type === 'end') {
+            notificationMessage = `吉米号码注册完毕 - 来自网址: ${currentUrl}，共处理${currentIndex}个号码`;
+        }
+
+        const apiUrl = `https://sms.jimmy.win/ppbKueUSDe2dCCneof9GN4/${encodeURIComponent(notificationMessage)}?sound=发财`;
+
+        // 使用fetch API的no-cors模式，避免跨域问题
+        fetch(apiUrl, { mode: 'no-cors' })
+            .then(() => {
+                console.log("API 通知已发送");
+                console.log("通知内容：", notificationMessage);
+            })
+            .catch(error => console.error("API 通知请求出错：", error));
+    }
+
+    function processNextNumber() {
+        if (!isRunning || !phoneNumbersLoaded) return;
+
+        if (isFirstRun) {
+            sendApiNotification('start');
+            localStorage.setItem('scriptStarted', 'true');
+            isFirstRun = false;
+        }
+
+        if (currentIndex >= phoneNumbers.length) {
+            alert("所有手机号码已发送完毕。");
+            sendApiNotification('end');
+            return;
+        }
+
+        console.log(`准备发送第 ${currentIndex + 1} 个号码: ${phoneNumbers[currentIndex]}`);
+        updateRemainingCount();
+        updateStatusDisplay();
+
+        // 使用改进的等待元素方法，提高响应速度
+        waitForElementFast('input[name="mobile"]')
+            .then(inputField => {
+                inputField.value = phoneNumbers[currentIndex];
+                console.log(`输入手机号码: ${phoneNumbers[currentIndex]}`);
+
+                // 触发输入事件，确保数据绑定
+                const event = new Event('input', { bubbles: true });
+                inputField.dispatchEvent(event);
+
+                return waitForElementFast('.btn.warning.get-code');
+            })
+            .then(sendButton => {
+                sendButton.click();
+                console.log("点击发送按钮。");
+
+                // 缩短确认按钮等待时间
+                return waitForElementFast('.swal2-confirm', 2000);
+            })
+            .then(yesButton => {
+                if (yesButton) {
+                    yesButton.click();
+                    console.log("点击确认按钮。");
+
+                    // 检查验证码，但不要立即刷新页面
+                    return new Promise(resolve => {
+                        setTimeout(() => {
+                            const captchaElement = document.getElementById('aliyunCaptcha-window-popup');
+                            const hasCaptcha = captchaElement && captchaElement.style.display === 'block';
+                            resolve(hasCaptcha);
+                        }, 1000);
+                    });
+                } else {
+                    throw new Error('未找到确认按钮');
+                }
+            })
+            .then(hasCaptcha => {
+                if (hasCaptcha) {
+                    console.log("检测到滑动验证码，进入手动模式。请处理验证码后点击'继续发送'按钮。");
+                    isWaitingForCaptcha = true;
+                    updateStatusDisplay();
+
+                    // 显示提示信息
+                    alert("检测到验证码，请手动完成验证后点击控制面板的'继续发送'按钮");
+
+                    // 不再自动刷新页面，等待用户手动点击继续
+                } else {
+                    console.log("未检测到验证码，继续下一个号码");
+                    currentIndex++;
+                    localStorage.setItem('currentIndex', currentIndex);
+
+                    if (currentIndex >= phoneNumbers.length - 3) {
+                        sendApiNotification('end');
+                    }
+
+                    // 短暂延迟后处理下一个号码
+                    setTimeout(() => {
+                        processNextNumber();
+                    }, 1000);
+                }
+            })
+            .catch(error => {
+                console.error('处理过程中出错：', error);
+                // 发生错误时，延迟较短时间后重试
+                setTimeout(() => {
+                    processNextNumber();
+                }, 2000);
+            });
+    }
+
+    // 改进的等待元素方法，使用Promise并支持更快的响应
+    function waitForElementFast(selector, timeout = 5000) {
+        return new Promise((resolve, reject) => {
+            // 先检查元素是否已存在
+            const element = document.querySelector(selector);
+            if (element) {
+                resolve(element);
+                return;
+            }
+
+            // 使用MutationObserver监听DOM变化
+            const observer = new MutationObserver((mutations, obs) => {
+                const element = document.querySelector(selector);
+                if (element) {
+                    obs.disconnect();
+                    resolve(element);
+                }
+            });
+
+            observer.observe(document.body, {
+                childList: true,
+                subtree: true
+            });
+
+            // 设置超时
+            setTimeout(() => {
+                observer.disconnect();
+                reject(new Error(`等待元素 ${selector} 超时`));
+            }, timeout);
+        });
+    }
+
+    function loadPhoneNumbers() {
+        fetch('https://zzz.jimmy.win/public/mobile1/pc4.txt')
+            .then(response => response.text())
+            .then(text => {
+                phoneNumbers = text
+                    .split('\n')
+                    .map(num => num.trim())
+                    .filter(num => num.length > 0);
+
+                phoneNumbersLoaded = true;
+                updateRemainingCount();
+
+                // 页面加载完成后自动执行脚本
+                if (document.readyState === 'complete') {
+                    init();
+                } else {
+                    window.addEventListener('load', init);
+                }
+            })
+            .catch(error => {
+                console.error('读取手机号列表失败：', error);
+                alert('无法加载手机号码列表');
+            });
+    }
+
+    function init() {
+        createButtons();
+        // 减少初始延迟
+        setTimeout(processNextNumber, 1000);
+    }
+})();
