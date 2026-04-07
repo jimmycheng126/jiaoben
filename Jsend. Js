@@ -1,0 +1,207 @@
+// ==UserScript==
+// @name         sendpc12
+// @namespace    http://tampermonkey.net/
+// @version      1.0
+// @description  pc1-2/1-1-25 5.07
+// @author       Jimmy cheng
+// @match        *://*/register
+// @match        *://*/register/SMSRegister
+// @grant        GM_log
+// @grant        GM_xmlhttpRequest
+// ==/UserScript==
+
+(function () {
+    'use strict';
+
+    // 手机号码库
+    const phoneNumbers = [
+    "01139433358",
+    "01139471706",
+    "01161739557",
+    "01161739551",
+    "01161739815",
+    "01161739814",
+    "01161366959",
+    "01161366920",
+    "01161366918",
+    "01161366908",
+    "01161367046",
+    "01161367006",
+    "01161366853",
+    "01161366831",
+    "01161367188",
+    "01161366958",
+    "01161739679",
+    "01161739660",
+    "01161739642",
+    "01161739638",
+    "01161739629",
+    "01161739241",
+    "01161739240",
+    "01161738890",
+    "01161738780",
+    "01161738770",
+    "01161738772",
+    "01161739072",
+    "01161738917",
+    "01161738895",
+    "01161739607",
+    "01161738747",
+    "01161738939",
+    "01161738922",
+    "01161739491",
+    "01161739930",
+    "01161739144",
+    "01161739433",
+    "01161739420",
+    "01161739197",
+    "01161739171",
+    "01161739259",
+    "01161739151",
+    "01161739716",
+    "01161739686",
+    "01161738783",
+    "01161738790",
+    "01161738815",
+    "01161739442",
+    "01161739525",
+    "01161739223"
+];
+
+
+    // 从 localStorage 获取当前索引
+    let currentIndex = parseInt(localStorage.getItem('currentIndex')) || 0;
+    let isRunning = true; // 控制脚本是否运行
+
+    // 防止重复运行
+    if (window.__SCRIPT_RUNNING__) return;
+    window.__SCRIPT_RUNNING__ = true;
+
+    // 创建按钮
+    function createButtons() {
+        // 停止按钮
+        const stopButton = document.createElement('button');
+        stopButton.innerText = '停止发送';
+        stopButton.style.position = 'fixed';
+        stopButton.style.top = '10px';
+        stopButton.style.right = '10px';
+        stopButton.style.zIndex = '1000';
+        stopButton.onclick = () => {
+            isRunning = false;
+            alert("发送已停止。");
+        };
+        document.body.appendChild(stopButton);
+
+        // 重置按钮
+        const resetButton = document.createElement('button');
+        resetButton.innerText = '重置号码';
+        resetButton.style.position = 'fixed';
+        resetButton.style.top = '50px';
+        resetButton.style.right = '10px';
+        resetButton.style.zIndex = '1000';
+        resetButton.onclick = () => {
+            currentIndex = 0; // 重置索引
+            localStorage.setItem('currentIndex', currentIndex); // 更新存储
+            alert("号码列表已重置，即将重新开始发送。");
+            processNextNumber(); // 重新开始发送
+        };
+        document.body.appendChild(resetButton);
+    }
+
+    // 检查元素是否加载完成
+    function waitForElement(selector, callback, interval = 500, timeout = 10000) {
+        const startTime = Date.now();
+        const timer = setInterval(() => {
+            const element = document.querySelector(selector);
+            if (element) {
+                clearInterval(timer);
+                callback(element);
+            } else if (Date.now() - startTime > timeout) {
+                clearInterval(timer);
+                console.error(`等待元素 ${selector} 超时`);
+            }
+        }, interval);
+    }
+
+    // 更新剩余号码显示
+    function updateRemainingCount() {
+        const remainingCount = phoneNumbers.length - currentIndex;
+        const display = document.getElementById('remainingCount');
+        if (display) {
+            display.innerText = `剩余号码: ${remainingCount}`;
+        } else {
+            const countDisplay = document.createElement('div');
+            countDisplay.id = 'remainingCount';
+            countDisplay.style.position = 'fixed';
+            countDisplay.style.top = '100px';
+            countDisplay.style.right = '10px';
+            countDisplay.style.zIndex = '1000';
+            countDisplay.style.backgroundColor = 'white';
+            countDisplay.style.padding = '10px';
+            countDisplay.style.border = '1px solid black';
+            countDisplay.innerText = `剩余号码: ${remainingCount}`;
+            document.body.appendChild(countDisplay);
+        }
+    }
+
+    // 检查验证码并刷新
+    function checkCaptchaAndReload() {
+        const captchaElement = document.getElementById('aliyunCaptcha-window-popup');
+        if (captchaElement && captchaElement.style.display === 'block') {
+            console.log("检测到滑动验证码，刷新页面...");
+            location.reload();
+        }
+    }
+
+    // 处理下一个手机号码
+    function processNextNumber() {
+        if (!isRunning) return; // 如果停止运行，直接返回
+
+        if (currentIndex >= phoneNumbers.length) {
+            alert("所有手机号码已发送完毕。");
+            return;
+        }
+
+        console.log(`准备发送第 ${currentIndex + 1} 个号码: ${phoneNumbers[currentIndex]}`);
+        updateRemainingCount(); // 更新剩余号码
+
+        // 等待输入框加载
+        waitForElement('input[name="mobile"]', (inputField) => {
+            inputField.value = phoneNumbers[currentIndex];
+            console.log(`输入手机号码: ${phoneNumbers[currentIndex]}`);
+
+            waitForElement('.btn.warning.get-code', (sendButton) => {
+                // 点击发送按钮
+                sendButton.click();
+                console.log("点击发送按钮。");
+
+                // 等待确认按钮
+                waitForElement('.swal2-confirm', (yesButton) => {
+                    yesButton.click();
+                    console.log("点击确认按钮。");
+
+                    // 检查滑动验证码
+                    setTimeout(() => {
+                        checkCaptchaAndReload();
+
+                        // 如果没有验证码，等待一段时间后处理下一个号码
+                        setTimeout(() => {
+                            currentIndex++;
+                            localStorage.setItem('currentIndex', currentIndex);
+                            processNextNumber(); // 继续处理下一个号码
+                        }, 3000);
+                    }, 1000);
+                });
+            });
+        });
+    }
+
+    // 初始化脚本
+    function init() {
+        createButtons(); // 创建按钮
+        updateRemainingCount(); // 显示剩余号码
+        processNextNumber(); // 开始处理号码
+    }
+
+    init(); // 启动脚本
+})();
